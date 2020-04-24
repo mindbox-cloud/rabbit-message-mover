@@ -10,7 +10,7 @@ RUN dotnet build -c Release
 
 RUN dotnet test 
 
-RUN dotnet publish ./RabbitMessageMover/RabbitMessageMover.csproj --no-build -o ./out
+RUN dotnet publish ./RabbitMessageMover/RabbitMessageMover.csproj -o ./out
 
 
 FROM mcr.microsoft.com/dotnet/core/runtime:3.0
