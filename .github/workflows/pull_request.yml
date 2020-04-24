@@ -1,0 +1,23 @@
+name: Pull Request
+
+on: pull_request
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    env:
+      image: rabbit-message-mover
+
+    steps:
+    - uses: actions/checkout@v1 
+          
+    - name: generate release number
+      id: release-number
+      uses: mindbox-moscow/gha-release-number@v1.0.1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build the Docker image
+      run: docker build . --tag mindboxmoscow/${{ env.image }}:${{ github.sha }} --tag mindboxmoscow/${{ env.image }}:${{ steps.release-number.outputs.release-number }} --tag mindboxmoscow/${{ env.image }}:latest
