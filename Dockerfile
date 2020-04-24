@@ -8,6 +8,8 @@ COPY . ./
 
 RUN dotnet build -c Release
 
+RUN dotnet test 
+
 RUN dotnet publish ./RabbitMessageMover/RabbitMessageMover.csproj --no-build -o ./out
 
 
