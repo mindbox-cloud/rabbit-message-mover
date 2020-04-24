@@ -77,3 +77,5 @@ nLog.config.template                                     text=auto diff merge
 .gitattributes                                           text=auto diff merge
 .gitignore                                               text=auto diff merge
 CODEOWNERS                                               text=auto diff merge
+
+Dockerfile                                               text=auto diff merge
