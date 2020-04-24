@@ -1,0 +1,40 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    env:
+      image: rabbit-message-mover
+
+    steps:
+    - uses: actions/checkout@v1 
+          
+    - name: generate release number
+      id: release-number
+      uses: mindbox-moscow/gha-release-number@v1.0.1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build the Docker image
+      run: docker build . --tag mindboxmoscow/${{ env.image }}:${{ github.sha }} --tag mindboxmoscow/${{ env.image }}:${{ steps.release-number.outputs.release-number }} --tag mindboxmoscow/${{ env.image }}:latest
+    
+    - name: authenticate in docker registry and push image
+      run: |
+        echo '${{ secrets.DOCKER_TOKEN }}' | docker login --username itmindbox --password-stdin
+        docker push mindboxmoscow/${{ env.image }}:${{ github.sha }}
+        docker push mindboxmoscow/${{ env.image }}:${{ steps.release-number.outputs.release-number }}
+        
+    - name: create github release
+      id: create_release
+      uses: actions/create-release@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.release-number.outputs.release-number }}
+        release_name: ${{ steps.release-number.outputs.release-number }}
+        draft: false
+        prerelease: false
