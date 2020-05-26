@@ -121,14 +121,16 @@ namespace RabbitMessageMover
 				var result = sourceModel.BasicGet(queue.Name, false);
 				if (result == null)
 					return;
-
+				var body = result.Body.ToArray();
+				
 				var properties = result.BasicProperties;
+				
 				destinationModel.BasicPublish(
 					exchange: string.Empty,
 					routingKey: queue.Name,
 					mandatory: true,
 					basicProperties: properties,
-					body: result.Body);
+					body: body);
 				destinationModel.WaitForConfirmsOrDie();
 				
 				sourceModel.BasicAck(result.DeliveryTag, false);
