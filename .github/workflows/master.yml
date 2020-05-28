@@ -27,7 +27,7 @@ jobs:
     
     - name: authenticate in docker registry and push image
       run: |
-        echo '${{ secrets.DOCKER_TOKEN }}' | docker login --username itmindbox --password-stdin
+        echo '${{ secrets.DOCKERHUB_REGISTRY_KEY }}' | docker login --username itmindbox --password-stdin
         docker push mindboxmoscow/${{ env.image }}:${{ github.sha }}
         docker push mindboxmoscow/${{ env.image }}:${{ steps.release-number.outputs.release-number }}
         
