@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json.Linq;
@@ -39,7 +40,7 @@ namespace RabbitMessageMover
 
 			Console.WriteLine("Preparing list of queues...");
 			
-			var queues = GetNonEmptyQueuesFromFile(args[3], queuePrefix);
+			var queues = GetNonEmptyQueuesFromFile(queuePrefix);
 
 			for (var i = 0; i < queues.Count; i++)
 			{
@@ -69,15 +70,17 @@ namespace RabbitMessageMover
 			return 0;
 		}
 
-		private static List<QueueInfoDto> GetNonEmptyQueuesFromFile(string filePath, string prefix)
+		private static List<QueueInfoDto> GetNonEmptyQueuesFromFile(string prefix)
 		{
 			if (string.IsNullOrEmpty(prefix))
 				throw new InvalidOperationException("prefix");
-			var lines = File.ReadLines(filePath);
+			using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("RabbitMessageMover.raw_queues.txt");
+			using var reader = new StreamReader(stream);
+			var lines = reader.ReadToEnd().Split(Environment.NewLine);
 			var queues = lines
 				.Select(q => new QueueInfoDto
 				{
-					Name = q
+					Name = q.Trim()
 				})
 				.Where(x => x.Name != null)
 				.Where(x => prefix == null || x.Name.StartsWith(prefix))

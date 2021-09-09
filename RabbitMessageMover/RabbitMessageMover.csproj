@@ -15,4 +15,9 @@
       <PackageReference Include="RabbitMQ.Client" Version="5.2.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="raw_queues.txt" />
+      <EmbeddedResource Include="raw_queues.txt" />
+    </ItemGroup>
+
 </Project>
