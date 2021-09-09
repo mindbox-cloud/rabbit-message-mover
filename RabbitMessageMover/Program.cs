@@ -80,6 +80,7 @@ namespace RabbitMessageMover
 			var resultUri = apiUriBuilder.Uri;
 
 			var request = WebRequest.CreateHttp(resultUri);
+			request.Timeout = (int)TimeSpan.FromMinutes(10).TotalMilliseconds;
 			request.Credentials = new NetworkCredential(RabbitMqAdministrationLogin, RabbitMqAdministrationPassword);
 			string responseText;
 			using (var response = request.GetResponse())
