@@ -24,7 +24,7 @@ namespace RabbitMessageMover
 
 		private static int Main(string[] args)
 		{
-			if (args.Length < 2 || args.Length > 3)
+			if (args.Length < 2 )
 			{
 				Console.WriteLine("Parameters:");
 				Console.WriteLine("1) Source server URI with AMQP protocol");
@@ -39,7 +39,7 @@ namespace RabbitMessageMover
 
 			Console.WriteLine("Preparing list of queues...");
 			
-			var queues = GetNonEmptyQueues(sourceUri, queuePrefix);
+			var queues = GetNonEmptyQueuesFromFile(args[3], queuePrefix);
 
 			for (var i = 0; i < queues.Count; i++)
 			{
@@ -69,6 +69,23 @@ namespace RabbitMessageMover
 			return 0;
 		}
 
+		private static List<QueueInfoDto> GetNonEmptyQueuesFromFile(string filePath, string prefix)
+		{
+			if (string.IsNullOrEmpty(prefix))
+				throw new InvalidOperationException("prefix");
+			var lines = File.ReadLines(filePath);
+			var queues = lines
+				.Select(q => new QueueInfoDto
+				{
+					Name = q
+				})
+				.Where(x => x.Name != null)
+				.Where(x => prefix == null || x.Name.StartsWith(prefix))
+				.ToList();
+
+			return queues;
+		}
+		
 		private static List<QueueInfoDto> GetNonEmptyQueues(string sourceUri, string prefix)
 		{
 			var apiUriBuilder = new UriBuilder(sourceUri)
