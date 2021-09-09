@@ -130,30 +130,37 @@ namespace RabbitMessageMover
 
 		private static void Move(QueueInfoDto queue, IConnection sourceConnection, IConnection destinationConnection)
 		{
-			using var sourceModel = sourceConnection.CreateModel();
-			using var destinationModel = destinationConnection.CreateModel();
-			
-			destinationModel.ConfirmSelect();
-			sourceModel.QueueDeclarePassive(queue.Name);
-			destinationModel.QueueDeclarePassive(queue.Name);
-			
-			while (true)
+			try
 			{
-				var result = sourceModel.BasicGet(queue.Name, false);
-				if (result == null)
-					return;
-				
-				var properties = result.BasicProperties;
-				
-				destinationModel.BasicPublish(
-					exchange: string.Empty,
-					routingKey: queue.Name,
-					mandatory: true,
-					basicProperties: properties,
-					body: result.Body);
-				destinationModel.WaitForConfirmsOrDie();
-				
-				sourceModel.BasicAck(result.DeliveryTag, false);
+				using var sourceModel = sourceConnection.CreateModel();
+				using var destinationModel = destinationConnection.CreateModel();
+
+				destinationModel.ConfirmSelect();
+				sourceModel.QueueDeclarePassive(queue.Name);
+				destinationModel.QueueDeclarePassive(queue.Name);
+
+				while (true)
+				{
+					var result = sourceModel.BasicGet(queue.Name, false);
+					if (result == null)
+						return;
+
+					var properties = result.BasicProperties;
+
+					destinationModel.BasicPublish(
+						exchange: string.Empty,
+						routingKey: queue.Name,
+						mandatory: true,
+						basicProperties: properties,
+						body: result.Body);
+					destinationModel.WaitForConfirmsOrDie();
+
+					sourceModel.BasicAck(result.DeliveryTag, false);
+				}
+			}
+			catch (Exception e)
+			{
+				Console.WriteLine($"Failed to move {queue.Name}, error: {e.Message}");
 			}
 		}
 	}
