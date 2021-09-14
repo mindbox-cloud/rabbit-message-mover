@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
 
@@ -12,38 +14,30 @@ namespace RabbitMessageMover
 {
 	class Program
 	{
-		private const int ThreadCount = 16;
-		private const int RabbitMqAdministrationPort = 15672;
-		private const string RabbitMqAdministrationLogin = "guest";
-		private const string RabbitMqAdministrationPassword = "guest";
+		private const int ThreadCount = 32;
 
-		private const string DeadLetterExchangeHeaderName = "x-dead-letter-exchange";
-		private const string DeadLetterRoutingKeyHeaderName = "x-dead-letter-routing-key";
-		private const string MessageTtlHeaderName = "x-message-ttl";
-		private const string ExpiresHeaderName = "x-expires";
-
-		private static int Main(string[] args)
+		private static async Task<int> Main(string[] args)
 		{
-			if (args.Length < 2 || args.Length > 3)
+			if (args.Length != 3)
 			{
 				Console.WriteLine("Parameters:");
 				Console.WriteLine("1) Source server URI with AMQP protocol");
 				Console.WriteLine("2) Destination server URI with AMQP protocol");
-				Console.WriteLine("3) Queue prefix (optional)");
+				Console.WriteLine("3) Queue list uri");
 				return 1;
 			}
 
 			var sourceUri = args[0];
 			var destinationUri = args[1];
-			var queuePrefix = args[2];
+			var queuesUri = args[2];
 
 			Console.WriteLine("Preparing list of queues...");
 			
-			var queues = GetNonEmptyQueues(sourceUri, queuePrefix);
+			var queues = await GetQueues(queuesUri);
 
 			for (var i = 0; i < queues.Count; i++)
 			{
-				Console.WriteLine("{0}) {1} ({2} m.)", i + 1, queues[i].Name, queues[i].MessageCount);
+				Console.WriteLine("{0} - {1}", i + 1, queues[i]);
 			}
 
 			using(var sourceConnection = new ConnectionFactory { Uri = new Uri(sourceUri) }.CreateConnection())
@@ -69,46 +63,18 @@ namespace RabbitMessageMover
 			return 0;
 		}
 
-		private static List<QueueInfoDto> GetNonEmptyQueues(string sourceUri, string prefix)
+		private static async Task<List<string>> GetQueues(string queuesUri)
 		{
-			var apiUriBuilder = new UriBuilder(sourceUri)
+			using (var client = new HttpClient())
 			{
-				Scheme = "http",
-				Port = RabbitMqAdministrationPort,
-				Path = "/api/queues/"
-			};
-			var resultUri = apiUriBuilder.Uri;
-
-			var request = WebRequest.CreateHttp(resultUri);
-			request.Timeout = (int)TimeSpan.FromMinutes(10).TotalMilliseconds;
-			request.Credentials = new NetworkCredential(RabbitMqAdministrationLogin, RabbitMqAdministrationPassword);
-			string responseText;
-			using (var response = request.GetResponse())
-			using (var responseStream = response.GetResponseStream())
-			using (var responseReader = new StreamReader(responseStream, Encoding.UTF8))
-				responseText = responseReader.ReadToEnd();
-
-			var queuesJsonData = JArray.Parse(responseText);
-			var queues = queuesJsonData
-				.Select(q => new QueueInfoDto
-				{
-					Name = q["name"]?.Value<string>(),
-					MessageCount = q["messages"]?.Value<int>() ?? 0,
-					DeadLetterExchange = q["arguments"]?[DeadLetterExchangeHeaderName]?.Value<string>(),
-					DeadLetterKey = q["arguments"]?[DeadLetterRoutingKeyHeaderName]?.Value<string>(),
-					MessageTtl = q["arguments"]?[MessageTtlHeaderName]?.Value<int>(),
-					Expires = q["arguments"]?[ExpiresHeaderName]?.Value<int>()
-
-				})
-				.Where(x => x.Name != null && x.MessageCount > 0)
-				.Where(x => prefix == null || x.Name.StartsWith(prefix))
-				.OrderByDescending(x => x.MessageCount)
-				.ToList();
-
-			return queues;
+				var uri = new Uri(queuesUri, UriKind.Absolute);
+				var content = await client.GetStringAsync(uri);
+				return content.Split(Environment.NewLine).Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s))
+					.ToList();
+			}
 		}
 
-		private static void Move(QueueInfoDto queue, IConnection sourceConnection, IConnection destinationConnection)
+		private static void Move(string queue, IConnection sourceConnection, IConnection destinationConnection)
 		{
 			try
 			{
@@ -116,12 +82,12 @@ namespace RabbitMessageMover
 				using var destinationModel = destinationConnection.CreateModel();
 
 				destinationModel.ConfirmSelect();
-				sourceModel.QueueDeclarePassive(queue.Name);
-				destinationModel.QueueDeclarePassive(queue.Name);
+				sourceModel.QueueDeclarePassive(queue);
+				destinationModel.QueueDeclarePassive(queue);
 
 				while (true)
 				{
-					var result = sourceModel.BasicGet(queue.Name, false);
+					var result = sourceModel.BasicGet(queue, false);
 					if (result == null)
 						return;
 
@@ -129,7 +95,7 @@ namespace RabbitMessageMover
 
 					destinationModel.BasicPublish(
 						exchange: string.Empty,
-						routingKey: queue.Name,
+						routingKey: queue,
 						mandatory: true,
 						basicProperties: properties,
 						body: result.Body);
@@ -140,7 +106,7 @@ namespace RabbitMessageMover
 			}
 			catch (Exception e)
 			{
-				Console.WriteLine($"Failed to move {queue.Name}, error: {e.Message}");
+				Console.WriteLine($"Failed to move {queue}, error: {e.Message}");
 			}
 		}
 	}
