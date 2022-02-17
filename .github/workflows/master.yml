@@ -33,11 +33,6 @@ jobs:
         
     - name: create github release
       id: create_release
-      uses: actions/create-release@master
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: mindbox-moscow/github-actions/create-github-release@master
       with:
-        tag_name: ${{ steps.release-number.outputs.release-number }}
-        release_name: ${{ steps.release-number.outputs.release-number }}
-        draft: false
-        prerelease: false
+        release-number: ${{ steps.release-number.outputs.release-number }}
